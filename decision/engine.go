@@ -218,14 +218,6 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("关键认知: 系统每3分钟扫描一次，但不意味着每次都要交易！\n")
 	sb.WriteString("大多数时候应该是 `wait` 或 `hold`，只在极佳机会时才开仓。\n\n")
 
-	// === 硬约束（风险控制）===
-	sb.WriteString("# 硬约束（风险控制）\n\n")
-	sb.WriteString("1. 风险回报比: 必须 ≥ 1:3（冒1%风险，赚3%+收益）\n")
-	sb.WriteString("2. 最多持仓: 3个币种（质量>数量）\n")
-	sb.WriteString(fmt.Sprintf("3. 单币仓位: 山寨%.0f-%.0f U(%dx杠杆) | BTC/ETH %.0f-%.0f U(%dx杠杆)\n",
-		accountEquity*0.8, accountEquity*1.5, altcoinLeverage, accountEquity*5, accountEquity*10, btcEthLeverage))
-	sb.WriteString("4. 保证金: 总使用率 ≤ 90%\n\n")
-
 	// === 交易哲学 & 最佳实践 ===
 	sb.WriteString("# 交易哲学 & 最佳实践\n\n")
 	sb.WriteString("## 核心原则：\n\n")
@@ -296,6 +288,21 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("3. 寻找新机会: 有强信号吗？多空机会？\n")
 	sb.WriteString("4. 输出决策: 思维链分析 + JSON\n\n")
 
+	// === 关键提醒 ===
+	sb.WriteString("---\n\n")
+	sb.WriteString("记住: \n")
+	sb.WriteString("- 目标是夏普比率，不是交易频率\n")
+	sb.WriteString("- 宁可错过，不做低质量交易\n")
+	sb.WriteString("- 风险回报比1:3是底线\n")
+
+	// === 硬约束（风险控制）===
+	sb.WriteString("# 硬约束（风险控制）\n\n")
+	sb.WriteString("1. 风险回报比: 必须 ≥ 1:3（冒1%风险，赚3%+收益）\n")
+	sb.WriteString("2. 最多持仓: 3个币种（质量>数量）\n")
+	sb.WriteString(fmt.Sprintf("3. 单币仓位: 山寨%.0f-%.0f U(%dx杠杆) | BTC/ETH %.0f-%.0f U(%dx杠杆)\n",
+		accountEquity*0.8, accountEquity*1.5, altcoinLeverage, accountEquity*5, accountEquity*10, btcEthLeverage))
+	sb.WriteString("4. 保证金: 总使用率 ≤ 90%\n\n")
+
 	// === 输出格式 ===
 	sb.WriteString("#输出格式\n\n")
 	sb.WriteString("第一步: 思维链（纯文本）\n")
@@ -309,13 +316,6 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("- `action`: open_long | open_short | close_long | close_short | hold | wait\n")
 	sb.WriteString("- `confidence`: 0-100（开仓建议≥75）\n")
 	sb.WriteString("- 开仓时必填: leverage, position_size_usd, stop_loss, take_profit, confidence, risk_usd, reasoning\n\n")
-
-	// === 关键提醒 ===
-	sb.WriteString("---\n\n")
-	sb.WriteString("记住: \n")
-	sb.WriteString("- 目标是夏普比率，不是交易频率\n")
-	sb.WriteString("- 宁可错过，不做低质量交易\n")
-	sb.WriteString("- 风险回报比1:3是底线\n")
 
 	return sb.String()
 }
