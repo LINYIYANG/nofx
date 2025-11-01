@@ -11,7 +11,7 @@ export const translations = {
     stopped: 'STOPPED',
 
     // Footer
-    footerTitle: 'NOFX - AI Trading Competition System',
+    footerTitle: 'AI Trading Competition System',
     footerWarning: '⚠️ Trading involves risk. Use at your own discretion.',
 
     // Stats Cards
@@ -121,7 +121,7 @@ export const translations = {
   },
   zh: {
     // Header
-    appTitle: 'AI交易竞赛',
+    appTitle: 'AI交易',
     subtitle: 'Qwen vs DeepSeek · 实时',
     competition: '竞赛',
     details: '详情',
@@ -129,7 +129,7 @@ export const translations = {
     stopped: '已停止',
 
     // Footer
-    footerTitle: 'NOFX - AI交易竞赛系统',
+    footerTitle: 'AI交易系统',
     footerWarning: '⚠️ 交易有风险，请谨慎使用。',
 
     // Stats Cards
