@@ -41,6 +41,18 @@ func Get(symbol string) (*Data, error) {
 		log.Printf("⚠️  WARNING: %s detected stale data (consecutive price freeze), skipping symbol", symbol)
 		return nil, fmt.Errorf("%s data is stale, possible cache failure", symbol)
 	}
+	
+	// 新增：获取15分钟K线 (最近10个)
+	klines15m, err := WSMonitorCli.GetCurrentKlines(symbol, "15m") // 多获取用于计算
+	if err != nil {
+		return nil, fmt.Errorf("获取15分钟K线失败: %v", err)
+	}
+
+	// 新增：获取1小时K线 (最近10个)
+	klines1h, err := WSMonitorCli.GetCurrentKlines(symbol, "1h") // 多获取用于计算
+	if err != nil {
+		return nil, fmt.Errorf("获取1小时K线失败: %v", err)
+	}
 
 	// 获取4小时K线数据 (最近10个)
 	klines4h, err = WSMonitorCli.GetCurrentKlines(symbol, "4h") // 多获取用于计算指标
@@ -61,6 +73,11 @@ func Get(symbol string) (*Data, error) {
 	currentEMA20 := calculateEMA(klines3m, 20)
 	currentMACD := calculateMACD(klines3m)
 	currentRSI7 := calculateRSI(klines3m, 7)
+	// 新增：计算15m和1h的EMA
+	currentRSI7_15m := calculateRSI(klines15m, 7)   // <-- 新增
+	currentEMA20_15m := calculateEMA(klines15m, 20) // <-- 新增
+	currentEMA20_1h := calculateEMA(klines1h, 20)   // <-- 新增
+	currentEMA50_1h := calculateEMA(klines1h, 50)   // <-- 新增
 
 	// 计算价格变化百分比
 	// 1小时价格变化 = 20个3分钟K线前的价格
@@ -105,6 +122,10 @@ func Get(symbol string) (*Data, error) {
 		CurrentEMA20:      currentEMA20,
 		CurrentMACD:       currentMACD,
 		CurrentRSI7:       currentRSI7,
+		CurrentRSI7_15m:   currentRSI7_15m,  // <-- 新增
+		CurrentEMA20_15m:  currentEMA20_15m, // <-- 新增
+		CurrentEMA20_1h:   currentEMA20_1h,  // <-- 新增
+		CurrentEMA50_1h:   currentEMA50_1h,  // <-- 新增
 		OpenInterest:      oiData,
 		FundingRate:       fundingRate,
 		IntradaySeries:    intradayData,
@@ -416,6 +437,11 @@ func Format(data *Data) string {
 	priceStr := formatPriceWithDynamicPrecision(data.CurrentPrice)
 	sb.WriteString(fmt.Sprintf("current_price = %s, current_ema20 = %.3f, current_macd = %.3f, current_rsi (7 period) = %.3f\n\n",
 		priceStr, data.CurrentEMA20, data.CurrentMACD, data.CurrentRSI7))
+
+	// 新增：打印15m和1h指标
+	sb.WriteString(fmt.Sprintf("15m_ema20 = %.3f\n", data.CurrentEMA20_15m))
+	sb.WriteString(fmt.Sprintf("1h_ema20 = %.3f, 1h_ema50 = %.3f\n\n",
+		data.CurrentEMA20_1h, data.CurrentEMA50_1h))
 
 	sb.WriteString(fmt.Sprintf("In addition, here is the latest %s open interest and funding rate for perps:\n\n",
 		data.Symbol))
