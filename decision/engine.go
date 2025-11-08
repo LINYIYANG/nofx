@@ -67,23 +67,24 @@ type OITopData struct {
 
 // Context 交易上下文（传递给AI的完整信息）
 type Context struct {
-	CurrentTime     string                  `json:"current_time"`
-	RuntimeMinutes  int                     `json:"runtime_minutes"`
-	CallCount       int                     `json:"call_count"`
-	Account         AccountInfo             `json:"account"`
-	Positions       []PositionInfo          `json:"positions"`
-	CandidateCoins  []CandidateCoin         `json:"candidate_coins"`
-	MarketDataMap   map[string]*market.Data `json:"-"` // 不序列化，但内部使用
-	OITopDataMap    map[string]*OITopData   `json:"-"` // OI Top数据映射
-	Performance     interface{}             `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
-	BTCETHLeverage  int                     `json:"-"` // BTC/ETH杠杆倍数（从配置读取）
-	AltcoinLeverage int                     `json:"-"` // 山寨币杠杆倍数（从配置读取）
+	CurrentTime         string                           `json:"current_time"`
+	RuntimeMinutes      int                              `json:"runtime_minutes"`
+	CallCount           int                              `json:"call_count"`
+	Account             AccountInfo                      `json:"account"`
+	Positions           []PositionInfo                   `json:"positions"`
+	CandidateCoins      []CandidateCoin                  `json:"candidate_coins"`
+	MarketDataMap       map[string]*market.Data          `json:"-"` // 不序列化，但内部使用
+	OITopDataMap        map[string]*OITopData            `json:"-"` // OI Top数据映射
+	Performance         interface{}                      `json:"-"` // 历史表现分析（logger.PerformanceAnalysis）
+	BTCETHLeverage      int                              `json:"-"` // BTC/ETH杠杆倍数（从配置读取）
+	AltcoinLeverage     int                              `json:"-"` // 山寨币杠杆倍数（从配置读取）
+	SentimentIndicators map[string]*market.SentimentData `json:"-"` // 市场情绪指标
 }
 
 // Decision AI的交易决策
 type Decision struct {
-	Symbol          string  `json:"symbol"`
-	Action          string  `json:"action"` // "open_long", "open_short", "close_long", "close_short", "update_stop_loss", "update_take_profit", "partial_close", "hold", "wait"
+	Symbol string `json:"symbol"`
+	Action string `json:"action"` // "open_long", "open_short", "close_long", "close_short", "update_stop_loss", "update_take_profit", "partial_close", "hold", "wait"
 
 	// 开仓参数
 	Leverage        int     `json:"leverage,omitempty"`
@@ -92,14 +93,14 @@ type Decision struct {
 	TakeProfit      float64 `json:"take_profit,omitempty"`
 
 	// 调整参数（新增）
-	NewStopLoss     float64 `json:"new_stop_loss,omitempty"`     // 用于 update_stop_loss
-	NewTakeProfit   float64 `json:"new_take_profit,omitempty"`   // 用于 update_take_profit
-	ClosePercentage float64 `json:"close_percentage,omitempty"`  // 用于 partial_close (0-100)
+	NewStopLoss     float64 `json:"new_stop_loss,omitempty"`    // 用于 update_stop_loss
+	NewTakeProfit   float64 `json:"new_take_profit,omitempty"`  // 用于 update_take_profit
+	ClosePercentage float64 `json:"close_percentage,omitempty"` // 用于 partial_close (0-100)
 
 	// 通用参数
-	Confidence      int     `json:"confidence,omitempty"` // 信心度 (0-100)
-	RiskUSD         float64 `json:"risk_usd,omitempty"`   // 最大美元风险
-	Reasoning       string  `json:"reasoning"`
+	Confidence int     `json:"confidence,omitempty"` // 信心度 (0-100)
+	RiskUSD    float64 `json:"risk_usd,omitempty"`   // 最大美元风险
+	Reasoning  string  `json:"reasoning"`
 }
 
 // FullDecision AI的完整决策（包含思维链）
@@ -120,6 +121,10 @@ func GetFullDecision(ctx *Context, mcpClient *mcp.Client) (*FullDecision, error)
 func GetFullDecisionWithCustomPrompt(ctx *Context, mcpClient *mcp.Client, customPrompt string, overrideBase bool, templateName string) (*FullDecision, error) {
 	// 1. 为所有币种获取市场数据
 	if err := fetchMarketDataForContext(ctx); err != nil {
+		return nil, fmt.Errorf("获取市场数据失败: %w", err)
+	}
+
+	if err := fetchMarketSentimentIndicatorsForContext(ctx); err != nil {
 		return nil, fmt.Errorf("获取市场数据失败: %w", err)
 	}
 
@@ -219,6 +224,35 @@ func fetchMarketDataForContext(ctx *Context) error {
 		}
 	}
 
+	return nil
+}
+
+// fetchMarketSentimentIndicatorsForContext 为上下文中的所有币种市场情绪指标
+func fetchMarketSentimentIndicatorsForContext(ctx *Context) error {
+	ctx.SentimentIndicators = make(map[string]*market.SentimentData)
+
+	// 收集所有需要获取数据的币种
+	symbolSet := make(map[string]struct{})
+
+	// 1. 优先获取持仓币种的数据（这是必须的）
+	for _, pos := range ctx.Positions {
+		symbolSet[pos.Symbol] = struct{}{}
+	}
+
+	// 2. 候选币种数量根据账户状态动态调整
+	maxCandidates := calculateMaxCandidates(ctx)
+	for i, coin := range ctx.CandidateCoins {
+		if i >= maxCandidates {
+			break
+		}
+		symbolSet[coin.Symbol] = struct{}{}
+	}
+
+	symbols := make([]string, 0, len(symbolSet))
+	for symbol, _ := range symbolSet {
+		symbols = append(symbols, symbol)
+	}
+	ctx.SentimentIndicators = market.GetSentimentIndicators(symbols)
 	return nil
 }
 
@@ -379,6 +413,12 @@ func buildUserPrompt(ctx *Context) string {
 				pos.EntryPrice, pos.MarkPrice, pos.UnrealizedPnLPct,
 				pos.Leverage, pos.MarginUsed, pos.LiquidationPrice, holdingDuration))
 
+			if sentiment, ok := ctx.SentimentIndicators[pos.Symbol]; ok {
+				sb.WriteString(fmt.Sprintf("%s 情绪指标 | 乐观%.4f 悲观%.4f | 净情绪值%.4f | 数据时间: %s | 数据延迟: %d分钟\n\n",
+					pos.Symbol, sentiment.PositiveRatio, sentiment.NegativeRatio,
+					sentiment.NetSentiment, sentiment.DataTime, sentiment.DataDelayMinutes))
+			}
+
 			// 使用FormatMarketData输出完整市场数据
 			if marketData, ok := ctx.MarketDataMap[pos.Symbol]; ok {
 				sb.WriteString(market.Format(marketData))
@@ -408,6 +448,13 @@ func buildUserPrompt(ctx *Context) string {
 
 		// 使用FormatMarketData输出完整市场数据
 		sb.WriteString(fmt.Sprintf("### %d. %s%s\n\n", displayedCount, coin.Symbol, sourceTags))
+
+		if sentiment, ok := ctx.SentimentIndicators[coin.Symbol]; ok {
+			sb.WriteString(fmt.Sprintf("%s 情绪指标 | 乐观%.4f 悲观%.4f | 净情绪值%.4f | 数据时间: %s | 数据延迟: %d分钟\n\n",
+				coin.Symbol, sentiment.PositiveRatio, sentiment.NegativeRatio,
+				sentiment.NetSentiment, sentiment.DataTime, sentiment.DataDelayMinutes))
+		}
+
 		sb.WriteString(market.Format(marketData))
 		sb.WriteString("\n")
 	}
@@ -675,8 +722,8 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 
 		// ✅ 验证最小开仓金额（防止数量格式化为 0 的错误）
 		// Binance 最小名义价值 10 USDT + 安全边际
-		const minPositionSizeGeneral = 12.0   // 10 + 20% 安全边际
-		const minPositionSizeBTCETH = 60.0    // BTC/ETH 因价格高和精度限制需要更大金额（更灵活）
+		const minPositionSizeGeneral = 12.0 // 10 + 20% 安全边际
+		const minPositionSizeBTCETH = 60.0  // BTC/ETH 因价格高和精度限制需要更大金额（更灵活）
 
 		if d.Symbol == "BTCUSDT" || d.Symbol == "ETHUSDT" {
 			if d.PositionSizeUSD < minPositionSizeBTCETH {
