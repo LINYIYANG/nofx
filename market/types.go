@@ -11,8 +11,10 @@ type Data struct {
 	CurrentEMA20      float64
 	CurrentMACD       float64
 	CurrentRSI7       float64
+	CurrentKLines_15m []Kline // 15分钟K线
 	CurrentRSI7_15m   float64 // 15分钟RSI7
 	CurrentEMA20_15m  float64 // 15分钟EMA20
+	CurrentKLines_1h  []Kline // 1小时K线
 	CurrentEMA20_1h   float64 // 1小时EMA20
 	CurrentEMA50_1h   float64 // 1小时EMA50
 	OpenInterest      *OIData

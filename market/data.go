@@ -41,7 +41,7 @@ func Get(symbol string) (*Data, error) {
 		log.Printf("⚠️  WARNING: %s detected stale data (consecutive price freeze), skipping symbol", symbol)
 		return nil, fmt.Errorf("%s data is stale, possible cache failure", symbol)
 	}
-	
+
 	// 新增：获取15分钟K线 (最近10个)
 	klines15m, err := WSMonitorCli.GetCurrentKlines(symbol, "15m") // 多获取用于计算
 	if err != nil {
@@ -122,8 +122,10 @@ func Get(symbol string) (*Data, error) {
 		CurrentEMA20:      currentEMA20,
 		CurrentMACD:       currentMACD,
 		CurrentRSI7:       currentRSI7,
+		CurrentKLines_15m: klines15m,        // <-- 新增
 		CurrentRSI7_15m:   currentRSI7_15m,  // <-- 新增
 		CurrentEMA20_15m:  currentEMA20_15m, // <-- 新增
+		CurrentKLines_1h:  klines1h,         // <-- 新增
 		CurrentEMA20_1h:   currentEMA20_1h,  // <-- 新增
 		CurrentEMA50_1h:   currentEMA50_1h,  // <-- 新增
 		OpenInterest:      oiData,
@@ -442,6 +444,29 @@ func Format(data *Data) string {
 	sb.WriteString(fmt.Sprintf("15m_ema20 = %.3f\n", data.CurrentEMA20_15m))
 	sb.WriteString(fmt.Sprintf("1h_ema20 = %.3f, 1h_ema50 = %.3f\n\n",
 		data.CurrentEMA20_1h, data.CurrentEMA50_1h))
+
+	sb.WriteString("15m kline:\n")
+	for _, kline := range data.CurrentKLines_15m[:min(10, len(data.CurrentKLines_15m))] {
+		sb.WriteString(fmt.Sprintf("open_time: %d, open_price = %s, high_price = %s, low_price = %s, close_price = %s, quote_volume = %f\n",
+			kline.OpenTime,
+			formatPriceWithDynamicPrecision(kline.Open),
+			formatPriceWithDynamicPrecision(kline.High),
+			formatPriceWithDynamicPrecision(kline.Low),
+			formatPriceWithDynamicPrecision(kline.Close),
+			kline.QuoteVolume,
+		))
+	}
+	sb.WriteString("1h kline:\n")
+	for _, kline := range data.CurrentKLines_1h[:min(10, len(data.CurrentKLines_1h))] {
+		sb.WriteString(fmt.Sprintf("open_time: %d, open_price = %s, high_price = %s, low_price = %s, close_price = %s, quote_volume = %f\n",
+			kline.OpenTime,
+			formatPriceWithDynamicPrecision(kline.Open),
+			formatPriceWithDynamicPrecision(kline.High),
+			formatPriceWithDynamicPrecision(kline.Low),
+			formatPriceWithDynamicPrecision(kline.Close),
+			kline.QuoteVolume,
+		))
+	}
 
 	sb.WriteString(fmt.Sprintf("In addition, here is the latest %s open interest and funding rate for perps:\n\n",
 		data.Symbol))
