@@ -325,8 +325,8 @@ function App() {
       >
         <div className="text-center">
           <img
-            src="/icons/nofx.svg"
-            alt="NoFx Logo"
+            src="/icons/logo.ico"
+            alt="Logo"
             className="w-16 h-16 mx-auto mb-4 animate-pulse"
           />
           <p style={{ color: '#EAECEF' }}>{t('loading', language)}</p>

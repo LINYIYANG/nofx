@@ -84,9 +84,9 @@ export default function HeaderBar({
           }}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
         >
-          <img src="/icons/nofx.svg" alt="NOFX Logo" className="w-7 h-7" />
+          <img src="/icons/logo.ico" alt="Logo" className="w-7 h-7" />
           <span className="text-lg font-bold text-nofx-gold">
-            NOFX
+            ZQ
           </span>
         </div>
 
