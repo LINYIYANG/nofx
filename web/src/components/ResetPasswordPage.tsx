@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { t } from '../i18n/translations'
-import { Header } from './Header'
+// import { Header } from './Header'
 import { ArrowLeft, KeyRound, Eye, EyeOff } from 'lucide-react'
 import PasswordChecklist from 'react-password-checklist'
 import { Input } from './ui/input'
@@ -56,7 +56,7 @@ export function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#0B0E11' }}>
-      <Header simple />
+      {/*<Header simple />*/}
 
       <div
         className="flex items-center justify-center"
