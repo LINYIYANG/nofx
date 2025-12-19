@@ -119,7 +119,7 @@ type Context struct {
 	MultiTFMarket   map[string]map[string]*market.Data `json:"-"`
 	OITopDataMap    map[string]*OITopData              `json:"-"`
 	QuantDataMap    map[string]*QuantData              `json:"-"`
-	OIRankingData   *provider.OIRankingData                `json:"-"` // Market-wide OI ranking data
+	OIRankingData   *provider.OIRankingData            `json:"-"` // Market-wide OI ranking data
 	BTCETHLeverage  int                                `json:"-"`
 	AltcoinLeverage int                                `json:"-"`
 	Timeframes      []string                           `json:"-"`
@@ -128,13 +128,14 @@ type Context struct {
 // Decision AI trading decision
 type Decision struct {
 	Symbol string `json:"symbol"`
-	Action string `json:"action"` // "open_long", "open_short", "close_long", "close_short", "hold", "wait"
+	Action string `json:"action"` // "open_long", "open_short", "close_long", "close_short", "update_stop_loss", "update_take_profit", "partial_close", "hold", "wait"
 
 	// Opening position parameters
 	Leverage        int     `json:"leverage,omitempty"`
 	PositionSizeUSD float64 `json:"position_size_usd,omitempty"`
 	StopLoss        float64 `json:"stop_loss,omitempty"`
 	TakeProfit      float64 `json:"take_profit,omitempty"`
+	ClosePercentage float64 `json:"close_percentage,omitempty"` // 用于 partial_close (0-100)
 
 	// Common parameters
 	Confidence int     `json:"confidence,omitempty"` // Confidence level (0-100)
@@ -841,13 +842,17 @@ func (e *StrategyEngine) BuildSystemPrompt(accountEquity float64, variant string
 	examplePositionSize := accountEquity * btcEthPosValueRatio
 	sb.WriteString(fmt.Sprintf("  {\"symbol\": \"BTCUSDT\", \"action\": \"open_short\", \"leverage\": %d, \"position_size_usd\": %.0f, \"stop_loss\": 97000, \"take_profit\": 91000, \"confidence\": 85, \"risk_usd\": 300},\n",
 		riskControl.BTCETHMaxLeverage, examplePositionSize))
+	sb.WriteString("  {\"symbol\": \"SOLUSDT\", \"action\": \"update_stop_loss\", \"stop_loss\": 155},\n")
 	sb.WriteString("  {\"symbol\": \"ETHUSDT\", \"action\": \"close_long\"}\n")
 	sb.WriteString("]\n```\n")
 	sb.WriteString("</decision>\n\n")
 	sb.WriteString("## Field Description\n\n")
-	sb.WriteString("- `action`: open_long | open_short | close_long | close_short | hold | wait\n")
+	sb.WriteString("- `action`: open_long | open_short | close_long | close_short | update_stop_loss | update_take_profit | partial_close | hold | wait\n")
 	sb.WriteString(fmt.Sprintf("- `confidence`: 0-100 (opening recommended ≥ %d)\n", riskControl.MinConfidence))
 	sb.WriteString("- Required when opening: leverage, position_size_usd, stop_loss, take_profit, confidence, risk_usd\n")
+	sb.WriteString("- When update_stop_loss, the following must be filled in: stop_loss.\n")
+	sb.WriteString("- When update_take_profit, the following must be filled in: take_profit.\n")
+	sb.WriteString("- When partial_close: close_percentage (0-100)\n\n")
 	sb.WriteString("- **IMPORTANT**: All numeric values must be calculated numbers, NOT formulas/expressions (e.g., use `27.76` not `3000 * 0.01`)\n\n")
 
 	// 8. Custom Prompt
@@ -1622,12 +1627,15 @@ func validateDecisions(decisions []Decision, accountEquity float64, btcEthLevera
 
 func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoinLeverage int, btcEthPosRatio, altcoinPosRatio float64) error {
 	validActions := map[string]bool{
-		"open_long":   true,
-		"open_short":  true,
-		"close_long":  true,
-		"close_short": true,
-		"hold":        true,
-		"wait":        true,
+		"open_long":          true,
+		"open_short":         true,
+		"close_long":         true,
+		"close_short":        true,
+		"update_stop_loss":   true,
+		"update_take_profit": true,
+		"partial_close":      true,
+		"hold":               true,
+		"wait":               true,
 	}
 
 	if !validActions[d.Action] {
@@ -1716,6 +1724,27 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 		if riskRewardRatio < 3.0 {
 			return fmt.Errorf("risk/reward ratio too low (%.2f:1), must be ≥3.0:1 [risk: %.2f%% reward: %.2f%%] [stop loss: %.2f take profit: %.2f]",
 				riskRewardRatio, riskPercent, rewardPercent, d.StopLoss, d.TakeProfit)
+		}
+	}
+
+	// 动态调整止损验证
+	if d.Action == "update_stop_loss" {
+		if d.StopLoss <= 0 {
+			return fmt.Errorf("新止损价格必须大于0: %.2f", d.StopLoss)
+		}
+	}
+
+	// 动态调整止盈验证
+	if d.Action == "update_take_profit" {
+		if d.TakeProfit <= 0 {
+			return fmt.Errorf("新止盈价格必须大于0: %.2f", d.TakeProfit)
+		}
+	}
+
+	// 部分平仓验证
+	if d.Action == "partial_close" {
+		if d.ClosePercentage <= 0 || d.ClosePercentage > 100 {
+			return fmt.Errorf("平仓百分比必须在0-100之间: %.1f", d.ClosePercentage)
 		}
 	}
 
