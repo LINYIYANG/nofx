@@ -117,6 +117,8 @@ type AutoTrader struct {
 	startTime             time.Time          // System start time
 	callCount             int                // AI call count
 	positionFirstSeenTime map[string]int64   // Position first seen time (symbol_side -> timestamp in milliseconds)
+	positionStopLoss      map[string]float64 // 持仓止损价格 (symbol_side -> stop_loss_price)
+	positionTakeProfit    map[string]float64 // 持仓止盈价格 (symbol_side -> take_profit_price)
 	stopMonitorCh         chan struct{}      // Used to stop monitoring goroutine
 	monitorWg             sync.WaitGroup     // Used to wait for monitoring goroutine to finish
 	peakPnLCache          map[string]float64 // Peak profit cache (symbol -> peak P&L percentage)
@@ -332,6 +334,8 @@ func NewAutoTrader(config AutoTraderConfig, st *store.Store, userID string) (*Au
 		callCount:             0,
 		isRunning:             false,
 		positionFirstSeenTime: make(map[string]int64),
+		positionStopLoss:      make(map[string]float64),
+		positionTakeProfit:    make(map[string]float64),
 		stopMonitorCh:         make(chan struct{}),
 		monitorWg:             sync.WaitGroup{},
 		peakPnLCache:          make(map[string]float64),
@@ -768,6 +772,10 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		peakPnlPct := at.peakPnLCache[posKey]
 		at.peakPnLCacheMutex.RUnlock()
 
+		// 获取止损止盈价格（用于后续推断平仓原因）
+		stopLoss := at.positionStopLoss[posKey]
+		takeProfit := at.positionTakeProfit[posKey]
+
 		positionInfos = append(positionInfos, decision.PositionInfo{
 			Symbol:           symbol,
 			Side:             side,
@@ -781,6 +789,8 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 			LiquidationPrice: liquidationPrice,
 			MarginUsed:       marginUsed,
 			UpdateTime:       updateTime,
+			StopLoss:         stopLoss,
+			TakeProfit:       takeProfit,
 		})
 	}
 
@@ -788,6 +798,8 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 	for key := range at.positionFirstSeenTime {
 		if !currentPositionKeys[key] {
 			delete(at.positionFirstSeenTime, key)
+			delete(at.positionStopLoss, key)
+			delete(at.positionTakeProfit, key)
 		}
 	}
 
@@ -1093,9 +1105,13 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 	// Set stop loss and take profit
 	if err := at.trader.SetStopLoss(decision.Symbol, "LONG", quantity, decision.StopLoss); err != nil {
 		logger.Infof("  ⚠ Failed to set stop loss: %v", err)
+	} else {
+		at.positionStopLoss[posKey] = decision.StopLoss // 记录止损价格
 	}
 	if err := at.trader.SetTakeProfit(decision.Symbol, "LONG", quantity, decision.TakeProfit); err != nil {
 		logger.Infof("  ⚠ Failed to set take profit: %v", err)
+	} else {
+		at.positionTakeProfit[posKey] = decision.TakeProfit // 记录止盈价格
 	}
 
 	return nil
@@ -1210,9 +1226,13 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	// Set stop loss and take profit
 	if err := at.trader.SetStopLoss(decision.Symbol, "SHORT", quantity, decision.StopLoss); err != nil {
 		logger.Infof("  ⚠ Failed to set stop loss: %v", err)
+	} else {
+		at.positionStopLoss[posKey] = decision.StopLoss // 记录止损价格
 	}
 	if err := at.trader.SetTakeProfit(decision.Symbol, "SHORT", quantity, decision.TakeProfit); err != nil {
 		logger.Infof("  ⚠ Failed to set take profit: %v", err)
+	} else {
+		at.positionTakeProfit[posKey] = decision.TakeProfit // 记录止盈价格
 	}
 
 	return nil
@@ -1412,6 +1432,14 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 		logger.Infof("  🚨 建议：手动平掉其中一个方向的持仓，或检查系统是否有BUG")
 	}
 
+	// 检查是否与当前止损相同，避免重复操作
+	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
+	currentStopLoss := at.positionStopLoss[posKey]
+	if math.Abs(currentStopLoss-decision.StopLoss) < 0.01 {
+		logger.Infof("  ℹ️  新止损价格(%.2f)与当前止损(%.2f)相同，跳过操作", decision.StopLoss, currentStopLoss)
+		return nil
+	}
+
 	// 取消旧的止损单（只删除止损单，不影响止盈单）
 	// 注意：如果存在双向持仓，这会删除两个方向的止损单
 	if err := at.trader.CancelStopLossOrders(decision.Symbol); err != nil {
@@ -1427,6 +1455,9 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	}
 
 	logger.Infof("  ✓ 止损已调整: %.2f (当前价格: %.2f)", decision.StopLoss, marketData.CurrentPrice)
+
+	// 更新内存中的止损价格
+	at.positionStopLoss[posKey] = decision.StopLoss
 	return nil
 }
 
@@ -1496,6 +1527,14 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 		logger.Infof("  🚨 建议：手动平掉其中一个方向的持仓，或检查系统是否有BUG")
 	}
 
+	// 检查是否与当前止盈相同，避免重复操作
+	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
+	currentTakeProfit := at.positionTakeProfit[posKey]
+	if math.Abs(currentTakeProfit-decision.TakeProfit) < 0.01 {
+		logger.Infof("  ℹ️  新止盈价格(%.2f)与当前止盈(%.2f)相同，跳过操作", decision.TakeProfit, currentTakeProfit)
+		return nil
+	}
+
 	// 取消旧的止盈单（只删除止盈单，不影响止损单）
 	// 注意：如果存在双向持仓，这会删除两个方向的止盈单
 	if err := at.trader.CancelTakeProfitOrders(decision.Symbol); err != nil {
@@ -1511,6 +1550,9 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	}
 
 	logger.Infof("  ✓ 止盈已调整: %.2f (当前价格: %.2f)", decision.TakeProfit, marketData.CurrentPrice)
+
+	// 更新内存中的止盈价格
+	at.positionTakeProfit[posKey] = decision.TakeProfit
 	return nil
 }
 

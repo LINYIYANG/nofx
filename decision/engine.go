@@ -50,7 +50,9 @@ type PositionInfo struct {
 	PeakPnLPct       float64 `json:"peak_pnl_pct"` // Historical peak profit percentage
 	LiquidationPrice float64 `json:"liquidation_price"`
 	MarginUsed       float64 `json:"margin_used"`
-	UpdateTime       int64   `json:"update_time"` // Position update timestamp (milliseconds)
+	UpdateTime       int64   `json:"update_time"`           // Position update timestamp (milliseconds)
+	StopLoss         float64 `json:"stop_loss,omitempty"`   // 止损价格（用于推断平仓原因）
+	TakeProfit       float64 `json:"take_profit,omitempty"` // 止盈价格（用于推断平仓原因）
 }
 
 // AccountInfo account information
@@ -1118,10 +1120,20 @@ func (e *StrategyEngine) formatPositionInfo(index int, pos PositionInfo, ctx *Co
 		positionValue = -positionValue
 	}
 
-	sb.WriteString(fmt.Sprintf("%d. %s %s | Entry %.4f Current %.4f | Qty %.4f | Position Value %.2f USDT | PnL%+.2f%% | PnL Amount%+.2f USDT | Peak PnL%.2f%% | Leverage %dx | Margin %.0f | Liq Price %.4f%s\n\n",
+	// 构建止损/止盈信息
+	stopLossTakeProfitInfo := ""
+	if pos.StopLoss > 0 && pos.TakeProfit > 0 {
+		stopLossTakeProfitInfo = fmt.Sprintf(" | Stop Loss%.4f | Take Profit%.4f", pos.StopLoss, pos.TakeProfit)
+	} else if pos.StopLoss > 0 {
+		stopLossTakeProfitInfo = fmt.Sprintf(" | Stop Loss%.4f", pos.StopLoss)
+	} else if pos.TakeProfit > 0 {
+		stopLossTakeProfitInfo = fmt.Sprintf(" | Take Profit%.4f", pos.TakeProfit)
+	}
+
+	sb.WriteString(fmt.Sprintf("%d. %s %s | Entry %.4f Current %.4f | Qty %.4f | Position Value %.2f USDT | PnL%+.2f%% | PnL Amount%+.2f USDT | Peak PnL%.2f%% | Leverage %dx | Margin %.0f | Liq Price %.4f%s%s\n\n",
 		index, pos.Symbol, strings.ToUpper(pos.Side),
 		pos.EntryPrice, pos.MarkPrice, pos.Quantity, positionValue, pos.UnrealizedPnLPct, pos.UnrealizedPnL, pos.PeakPnLPct,
-		pos.Leverage, pos.MarginUsed, pos.LiquidationPrice, holdingDuration))
+		pos.Leverage, pos.MarginUsed, pos.LiquidationPrice, holdingDuration, stopLossTakeProfitInfo))
 
 	if marketData, ok := ctx.MarketDataMap[pos.Symbol]; ok {
 		sb.WriteString(e.formatMarketData(marketData))
