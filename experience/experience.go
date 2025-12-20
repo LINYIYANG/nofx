@@ -11,8 +11,8 @@ import (
 
 const (
 	telemetryEndpoint = "https://www.google-analytics.com/mp/collect"
-	tid               = "G-14J8SY6F0J"
-	tk                = "sgPLmshGTPiF-X57rzEIKA"
+	tid               = "G-G3T3WQWKPZ"
+	tk                = "vqZUO96-Qdeh7mpqs6NzYw"
 )
 
 var (
