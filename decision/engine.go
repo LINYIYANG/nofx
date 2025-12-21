@@ -1123,14 +1123,14 @@ func (e *StrategyEngine) formatPositionInfo(index int, pos PositionInfo, ctx *Co
 	// 构建止损/止盈信息
 	stopLossTakeProfitInfo := ""
 	if pos.StopLoss > 0 && pos.TakeProfit > 0 {
-		stopLossTakeProfitInfo = fmt.Sprintf(" | Stop Loss%.4f | Take Profit%.4f", pos.StopLoss, pos.TakeProfit)
+		stopLossTakeProfitInfo = fmt.Sprintf(" | Stop Loss %.4f | Take Profit %.4f", pos.StopLoss, pos.TakeProfit)
 	} else if pos.StopLoss > 0 {
-		stopLossTakeProfitInfo = fmt.Sprintf(" | Stop Loss%.4f", pos.StopLoss)
+		stopLossTakeProfitInfo = fmt.Sprintf(" | Stop Loss %.4f", pos.StopLoss)
 	} else if pos.TakeProfit > 0 {
-		stopLossTakeProfitInfo = fmt.Sprintf(" | Take Profit%.4f", pos.TakeProfit)
+		stopLossTakeProfitInfo = fmt.Sprintf(" | Take Profit %.4f", pos.TakeProfit)
 	}
 
-	sb.WriteString(fmt.Sprintf("%d. %s %s | Entry %.4f Current %.4f | Qty %.4f | Position Value %.2f USDT | PnL%+.2f%% | PnL Amount%+.2f USDT | Peak PnL%.2f%% | Leverage %dx | Margin %.0f | Liq Price %.4f%s%s\n\n",
+	sb.WriteString(fmt.Sprintf("%d. %s %s | Entry %.4f Current %.4f | Qty %.4f | Position Value %.2f USDT | PnL %+.2f%% | PnL Amount %+.2f USDT | Peak PnL %.2f%% | Leverage %dx | Margin %.0f | Liq Price %.4f%s%s\n\n",
 		index, pos.Symbol, strings.ToUpper(pos.Side),
 		pos.EntryPrice, pos.MarkPrice, pos.Quantity, positionValue, pos.UnrealizedPnLPct, pos.UnrealizedPnL, pos.PeakPnLPct,
 		pos.Leverage, pos.MarginUsed, pos.LiquidationPrice, holdingDuration, stopLossTakeProfitInfo))
