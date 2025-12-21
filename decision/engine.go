@@ -1734,7 +1734,7 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 		}
 
 		if riskRewardRatio < 3.0 {
-			return fmt.Errorf("risk/reward ratio too low (%.2f:1), must be ≥3.0:1 [risk: %.2f%% reward: %.2f%%] [stop loss: %.2f take profit: %.2f]",
+			return fmt.Errorf("risk/reward ratio too low (%.2f:1), must be ≥3.0:1 [risk: %.2f%% reward: %.2f%%] [stop loss: %f take profit: %f]",
 				riskRewardRatio, riskPercent, rewardPercent, d.StopLoss, d.TakeProfit)
 		}
 	}
@@ -1742,14 +1742,14 @@ func validateDecision(d *Decision, accountEquity float64, btcEthLeverage, altcoi
 	// 动态调整止损验证
 	if d.Action == "update_stop_loss" {
 		if d.StopLoss <= 0 {
-			return fmt.Errorf("新止损价格必须大于0: %.2f", d.StopLoss)
+			return fmt.Errorf("新止损价格必须大于0: %f", d.StopLoss)
 		}
 	}
 
 	// 动态调整止盈验证
 	if d.Action == "update_take_profit" {
 		if d.TakeProfit <= 0 {
-			return fmt.Errorf("新止盈价格必须大于0: %.2f", d.TakeProfit)
+			return fmt.Errorf("新止盈价格必须大于0: %f", d.TakeProfit)
 		}
 	}
 

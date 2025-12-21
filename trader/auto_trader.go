@@ -1368,7 +1368,7 @@ func (at *AutoTrader) executeCloseShortWithRecord(decision *decision.Decision, a
 
 // executeUpdateStopLossWithRecord 执行调整止损并记录详细信息
 func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decision, actionRecord *store.DecisionAction) error {
-	logger.Infof("  🎯 调整止损: %s → %.2f", decision.Symbol, decision.StopLoss)
+	logger.Infof("  🎯 调整止损: %s → %f", decision.Symbol, decision.StopLoss)
 
 	// 获取当前价格
 	marketData, err := market.Get(decision.Symbol)
@@ -1404,11 +1404,11 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	positionAmt, _ := targetPosition["positionAmt"].(float64)
 
 	// 验证新止损价格合理性
-	if positionSide == "LONG" && decision.TakeProfit >= marketData.CurrentPrice {
-		return fmt.Errorf("多单止损必须低于当前价格 (当前: %.2f, 新止损: %.2f)", marketData.CurrentPrice, decision.TakeProfit)
+	if positionSide == "LONG" && decision.StopLoss >= marketData.CurrentPrice {
+		return fmt.Errorf("多单止损必须低于当前价格 (当前: %f, 新止损: %f)", marketData.CurrentPrice, decision.StopLoss)
 	}
 	if positionSide == "SHORT" && decision.StopLoss <= marketData.CurrentPrice {
-		return fmt.Errorf("空单止损必须高于当前价格 (当前: %.2f, 新止损: %.2f)", marketData.CurrentPrice, decision.StopLoss)
+		return fmt.Errorf("空单止损必须高于当前价格 (当前: %f, 新止损: %f)", marketData.CurrentPrice, decision.StopLoss)
 	}
 
 	// ⚠️ 防御性检查：检测是否存在双向持仓（不应该出现，但提供保护）
@@ -1436,7 +1436,7 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
 	currentStopLoss := at.positionStopLoss[posKey]
 	if math.Abs(currentStopLoss-decision.StopLoss) < 0.01 {
-		logger.Infof("  ℹ️  新止损价格(%.2f)与当前止损(%.2f)相同，跳过操作", decision.StopLoss, currentStopLoss)
+		logger.Infof("  ℹ️  新止损价格(%f)与当前止损(%f)相同，跳过操作", decision.StopLoss, currentStopLoss)
 		return nil
 	}
 
@@ -1454,7 +1454,7 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 		return fmt.Errorf("修改止损失败: %w", err)
 	}
 
-	logger.Infof("  ✓ 止损已调整: %.2f (当前价格: %.2f)", decision.StopLoss, marketData.CurrentPrice)
+	logger.Infof("  ✓ 止损已调整: %f (当前价格: %f)", decision.StopLoss, marketData.CurrentPrice)
 
 	// 更新内存中的止损价格
 	at.positionStopLoss[posKey] = decision.StopLoss
@@ -1463,7 +1463,7 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 
 // executeUpdateTakeProfitWithRecord 执行调整止盈并记录详细信息
 func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decision, actionRecord *store.DecisionAction) error {
-	logger.Infof("  🎯 调整止盈: %s → %.2f", decision.Symbol, decision.TakeProfit)
+	logger.Infof("  🎯 调整止盈: %s → %f", decision.Symbol, decision.TakeProfit)
 
 	// 获取当前价格
 	marketData, err := market.Get(decision.Symbol)
@@ -1500,10 +1500,10 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 
 	// 验证新止盈价格合理性
 	if positionSide == "LONG" && decision.TakeProfit <= marketData.CurrentPrice {
-		return fmt.Errorf("多单止盈必须高于当前价格 (当前: %.2f, 新止盈: %.2f)", marketData.CurrentPrice, decision.TakeProfit)
+		return fmt.Errorf("多单止盈必须高于当前价格 (当前: %f, 新止盈: %f)", marketData.CurrentPrice, decision.TakeProfit)
 	}
 	if positionSide == "SHORT" && decision.TakeProfit >= marketData.CurrentPrice {
-		return fmt.Errorf("空单止盈必须低于当前价格 (当前: %.2f, 新止盈: %.2f)", marketData.CurrentPrice, decision.TakeProfit)
+		return fmt.Errorf("空单止盈必须低于当前价格 (当前: %f, 新止盈: %f)", marketData.CurrentPrice, decision.TakeProfit)
 	}
 
 	// ⚠️ 防御性检查：检测是否存在双向持仓（不应该出现，但提供保护）
@@ -1531,7 +1531,7 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
 	currentTakeProfit := at.positionTakeProfit[posKey]
 	if math.Abs(currentTakeProfit-decision.TakeProfit) < 0.01 {
-		logger.Infof("  ℹ️  新止盈价格(%.2f)与当前止盈(%.2f)相同，跳过操作", decision.TakeProfit, currentTakeProfit)
+		logger.Infof("  ℹ️  新止盈价格(%f)与当前止盈(%f)相同，跳过操作", decision.TakeProfit, currentTakeProfit)
 		return nil
 	}
 
@@ -1549,7 +1549,7 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 		return fmt.Errorf("修改止盈失败: %w", err)
 	}
 
-	logger.Infof("  ✓ 止盈已调整: %.2f (当前价格: %.2f)", decision.TakeProfit, marketData.CurrentPrice)
+	logger.Infof("  ✓ 止盈已调整: %f (当前价格: %f)", decision.TakeProfit, marketData.CurrentPrice)
 
 	// 更新内存中的止盈价格
 	at.positionTakeProfit[posKey] = decision.TakeProfit
@@ -1658,7 +1658,7 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	// 重要：币安等交易所在部分平仓后会自动取消原有的 TP/SL 订单（因为数量不匹配）
 	// 如果 AI 提供了新的止损止盈价格，则为剩余仓位重新设置保护
 	if decision.StopLoss > 0 {
-		logger.Infof("  → 为剩余仓位 %.4f 恢复止损单: %.2f", remainingQuantity, decision.StopLoss)
+		logger.Infof("  → 为剩余仓位 %.4f 恢复止损单: %.4f", remainingQuantity, decision.StopLoss)
 		err = at.trader.SetStopLoss(decision.Symbol, positionSide, remainingQuantity, decision.StopLoss)
 		if err != nil {
 			logger.Infof("  ⚠️ 恢复止损失败: %v（不影响平仓结果）", err)
@@ -1666,7 +1666,7 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	}
 
 	if decision.TakeProfit > 0 {
-		logger.Infof("  → 为剩余仓位 %.4f 恢复止盈单: %.2f", remainingQuantity, decision.TakeProfit)
+		logger.Infof("  → 为剩余仓位 %.4f 恢复止盈单: %.4f", remainingQuantity, decision.TakeProfit)
 		err = at.trader.SetTakeProfit(decision.Symbol, positionSide, remainingQuantity, decision.TakeProfit)
 		if err != nil {
 			logger.Infof("  ⚠️ 恢复止盈失败: %v（不影响平仓结果）", err)
