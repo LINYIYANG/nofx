@@ -955,10 +955,10 @@ func (s *PositionStore) GetHistorySummary(traderID string) (*HistorySummary, err
 	// Get direction stats
 	dirStats, _ := s.GetDirectionStats(traderID)
 	for _, d := range dirStats {
-		if d.Side == "LONG" {
+		if strings.ToUpper(d.Side) == "LONG" {
 			summary.LongWinRate = d.WinRate
 			summary.LongPnL = d.TotalPnL
-		} else if d.Side == "SHORT" {
+		} else if strings.ToUpper(d.Side) == "SHORT" {
 			summary.ShortWinRate = d.WinRate
 			summary.ShortPnL = d.TotalPnL
 		}

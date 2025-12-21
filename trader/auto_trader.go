@@ -2053,7 +2053,7 @@ func (at *AutoTrader) checkPositionDrawdown() {
 		}
 
 		var currentPnLPct float64
-		if side == "long" {
+		if strings.ToLower(side) == "long" {
 			currentPnLPct = ((markPrice - entryPrice) / entryPrice) * float64(leverage) * 100
 		} else {
 			currentPnLPct = ((entryPrice - markPrice) / entryPrice) * float64(leverage) * 100
