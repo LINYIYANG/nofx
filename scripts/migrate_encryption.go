@@ -7,8 +7,6 @@ import (
 	"os"
 
 	"nofx/crypto"
-
-	_ "modernc.org/sqlite"
 )
 
 func main() {
